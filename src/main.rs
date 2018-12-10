@@ -77,7 +77,10 @@ fn main() {
   let mut level = 0;
   let mut child_printed = false;
   loop {
-    if tree_cursor.goto_next_sibling() {
+    if !child_printed && tree_cursor.goto_first_child() {
+      indent +=1;
+      print_node(&tree_cursor.node(), &source_code, indent);
+    } else if tree_cursor.goto_next_sibling() {
       child_printed = false;
       print_node(&tree_cursor.node(), &source_code, indent);
       if tree_cursor.goto_first_child() {
@@ -85,9 +88,6 @@ fn main() {
         level += 1;
         print_node(&tree_cursor.node(), &source_code, indent);
       }
-    } else if !child_printed && tree_cursor.goto_first_child() {
-      indent +=1;
-      print_node(&tree_cursor.node(), &source_code, indent);
     } else {
         if level > 0 {
           tree_cursor.goto_parent();
