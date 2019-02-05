@@ -91,7 +91,7 @@ pub struct TreePropertyCursor<'a, P> {
     state_stack: Vec<usize>,
     child_index_stack: Vec<usize>,
     property_sheet: &'a PropertySheet<P>,
-    source: &'a str,
+    source: &'a [u8],
 }
 
 impl Language {
@@ -185,11 +185,12 @@ impl Parser {
         unsafe { ffi::ts_parser_set_logger(self.0, c_logger) };
     }
 
-    pub fn parse_str(&mut self, input: &str, old_tree: Option<&Tree>) -> Option<Tree> {
-        let bytes = input.as_bytes();
+    pub fn parse<T: AsRef<[u8]>>(&mut self, input: T, old_tree: Option<&Tree>) -> Option<Tree> {
+        let bytes = input.as_ref();
+        let len = bytes.len();
         self.parse_utf8(
             &mut |offset, _| {
-                if offset < bytes.len() {
+                if offset < len {
                     &bytes[offset..]
                 } else {
                     &[]
@@ -197,6 +198,11 @@ impl Parser {
             },
             old_tree,
         )
+    }
+
+    #[deprecated(since="0.3.6", note="please use `parse<T>` instead")]
+    pub fn parse_str(&mut self, input: &str, old_tree: Option<&Tree>) -> Option<Tree> {
+        self.parse(input, old_tree)
     }
 
     pub fn parse_utf8<'a, T: FnMut(usize, Point) -> &'a [u8]>(
@@ -382,8 +388,9 @@ impl Tree {
     pub fn walk_with_properties<'a, P>(
         &'a self,
         property_sheet: &'a PropertySheet<P>,
-        source: &'a str,
-    ) -> TreePropertyCursor<'a, P> {
+        source: &'a [u8],
+    ) -> TreePropertyCursor<'a, P>
+    {
         TreePropertyCursor::new(self, property_sheet, source)
     }
 }
@@ -591,7 +598,7 @@ impl<'a> Drop for TreeCursor<'a> {
 }
 
 impl<'a, P> TreePropertyCursor<'a, P> {
-    fn new(tree: &'a Tree, property_sheet: &'a PropertySheet<P>, source: &'a str) -> Self {
+    fn new(tree: &'a Tree, property_sheet: &'a PropertySheet<P>, source: &'a [u8]) -> Self {
         let mut result = Self {
             cursor: tree.root_node().walk(),
             child_index_stack: vec![0],
@@ -668,7 +675,7 @@ impl<'a, P> TreePropertyCursor<'a, P> {
                 for transition in transitions.iter() {
                     if let Some(text_regex_index) = transition.text_regex_index {
                         let node = self.cursor.node();
-                        let text = &self.source.as_bytes()[node.start_byte()..node.end_byte()];
+                        let text = &self.source[node.start_byte()..node.end_byte()];
                         if let Ok(text) = str::from_utf8(text) {
                             if !self.property_sheet.text_regexes[text_regex_index].is_match(text) {
                                 continue;
@@ -849,7 +856,7 @@ mod tests {
         parser.set_language(rust()).unwrap();
 
         let tree = parser
-            .parse_str(
+            .parse(
                 "
             struct Stuff {}
             fn main() {}
@@ -881,7 +888,7 @@ mod tests {
         })));
 
         parser
-            .parse_str(
+            .parse(
                 "
             struct Stuff {}
             fn main() {}
@@ -903,7 +910,7 @@ mod tests {
         parser.set_language(rust()).unwrap();
 
         let tree = parser
-            .parse_str(
+            .parse(
                 "
                     struct Stuff {
                         a: A;
@@ -938,7 +945,7 @@ mod tests {
         let mut parser = Parser::new();
         parser.set_language(rust()).unwrap();
         let source_code = "fn f1() { f2(); }";
-        let tree = parser.parse_str(source_code, None).unwrap();
+        let tree = parser.parse(source_code, None).unwrap();
 
         #[derive(Debug, Deserialize, PartialEq, Eq)]
         struct Properties {
@@ -999,7 +1006,7 @@ mod tests {
         )
         .unwrap();
 
-        let mut cursor = tree.walk_with_properties(&property_sheet, source_code);
+        let mut cursor = tree.walk_with_properties(&property_sheet, source_code.as_bytes());
         assert_eq!(cursor.node().kind(), "source_file");
         assert_eq!(*cursor.node_properties(), empty_properties);
 
@@ -1050,7 +1057,7 @@ mod tests {
         let mut parser = Parser::new();
         parser.set_language(rust()).unwrap();
         let source_code = "fn f1() { None(a()) }";
-        let tree = parser.parse_str(source_code, None).unwrap();
+        let tree = parser.parse(source_code, None).unwrap();
 
         #[derive(Debug, Deserialize, PartialEq, Eq)]
         struct Properties {
@@ -1102,7 +1109,7 @@ mod tests {
         )
         .unwrap();
 
-        let mut cursor = tree.walk_with_properties(&property_sheet, source_code);
+        let mut cursor = tree.walk_with_properties(&property_sheet, source_code.as_bytes());
         assert_eq!(cursor.node().kind(), "source_file");
         assert_eq!(*cursor.node_properties(), empty_properties);
 
@@ -1204,7 +1211,7 @@ mod tests {
     fn test_node_equality() {
         let mut parser = Parser::new();
         parser.set_language(rust()).unwrap();
-        let tree = parser.parse_str("struct A {}", None).unwrap();
+        let tree = parser.parse("struct A {}", None).unwrap();
         let node1 = tree.root_node();
         let node2 = tree.root_node();
         assert_eq!(node1, node2);
@@ -1302,7 +1309,7 @@ mod tests {
 
         let mut parser = Parser::new();
         parser.set_language(rust()).unwrap();
-        let tree = parser.parse_str(this_file_source, None).unwrap();
+        let tree = parser.parse(this_file_source, None).unwrap();
 
         let mut parse_threads = Vec::new();
         for thread_id in 1..5 {
@@ -1331,7 +1338,7 @@ mod tests {
                 let mut parser = Parser::new();
                 parser.set_language(rust()).unwrap();
                 parser
-                    .parse_str(&prepended_source, Some(&tree_clone))
+                    .parse(&prepended_source, Some(&tree_clone))
                     .unwrap()
             }));
         }
