@@ -1,6 +1,15 @@
 Rust Tree-sitter
 ===========================
 
+-----
+
+:warning: This repository is *deprecated* :warning:
+
+The Rust binding to Tree-sitter has been moved to [the main Tree-sitter repo](https://github.com/tree-sitter/tree-sitter).
+
+-----
+
+
 [![Build Status](https://travis-ci.org/tree-sitter/rust-tree-sitter.svg)](https://travis-ci.org/tree-sitter/rust-tree-sitter)
 [![Build status](https://ci.appveyor.com/api/projects/status/d0f6vqq3rflxx3y6/branch/master?svg=true)](https://ci.appveyor.com/project/maxbrunsfeld/rust-tree-sitter/branch/master)
 [![Crates.io](https://img.shields.io/crates/v/tree-sitter.svg)](https://crates.io/crates/tree-sitter)
